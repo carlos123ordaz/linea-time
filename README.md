@@ -91,8 +91,9 @@ en Supabase, que no pasan por RLS.
 
 ## Cómo se usa
 
-- **Clic en un momento** → qué pasó, quiénes estaban, sus fotos, editar o eliminar. Dentro
-  del panel, las flechas `‹ ›` recorren la línea sin cerrarlo.
+- **Clic en un momento** → se abre una ficha centrada con qué pasó, quiénes estaban y sus
+  fotos. Las flechas `‹ ›` recorren la línea sin cerrarla, y editar, eliminar y cerrar están
+  en iconos para que lo único que pese sea el recuerdo.
 - **+ Momento** → agrega algo nuevo en cualquier fecha. La línea se reordena sola.
 - **Si borras algo por error**, el aviso de abajo trae **Deshacer** durante 14 segundos.
 
@@ -149,9 +150,10 @@ linea-time/
 └── src/
     ├── components/
     │   ├── TimelineCanvas.tsx   el hilo dorado (SVG)
-    │   ├── EventDetail.tsx      el momento abierto
+    │   ├── EventDetail.tsx      la ficha centrada del momento
     │   ├── EventForm.tsx        agregar / editar, subir fotos, elegir color
     │   ├── EmojiPicker.tsx      lista de emojis por categoría
+    │   ├── Icono.tsx            iconos de trazo, sin librería
     │   ├── Lightbox.tsx         ver las fotos a pantalla completa
     │   ├── Toast.tsx            avisos y deshacer
     │   └── Starfield.tsx        el polvo dorado del fondo

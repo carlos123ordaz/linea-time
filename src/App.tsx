@@ -229,14 +229,6 @@ export default function App() {
       )}
 
       {selected && (
-        <button
-          className="drawer-scrim"
-          aria-label="Cerrar panel"
-          onClick={() => setSelectedId(null)}
-        />
-      )}
-
-      {selected && (
         <EventDetail
           event={selected}
           posicion={{ i: selectedIndex, total: events.length }}

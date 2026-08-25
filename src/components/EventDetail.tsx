@@ -3,6 +3,7 @@ import type { TimelineEvent } from '../types';
 import { fechaLarga } from '../lib/format';
 import { colorDe } from '../lib/colores';
 import { Lightbox } from './Lightbox';
+import { Icono } from './Icono';
 
 const KIND_LABEL: Record<TimelineEvent['kind'], string> = {
   origen: 'Origen',
@@ -31,81 +32,132 @@ export function EventDetail({
   onEdit,
   onDelete,
 }: Props) {
-  const [confirm, setConfirm] = useState(false);
+  const [confirmar, setConfirmar] = useState(false);
   const [verFoto, setVerFoto] = useState<number | null>(null);
   const color = colorDe(event.color);
 
+  const primero = posicion.i === 0;
+  const ultimo = posicion.i === posicion.total - 1;
+
   return (
-    <aside className="drawer drawer--right" role="dialog" aria-label={event.title}>
-      <div
-        className="drawer-franja"
-        style={{ background: `linear-gradient(90deg, ${color.base}, ${color.claro})` }}
-      />
-      <div className="drawer-topbar">
-        <div className="drawer-nav">
-          <button
-            className="icon-btn"
-            onClick={onPrev}
-            disabled={posicion.i === 0}
-            aria-label="Momento anterior"
-            title="Momento anterior (←)"
-          >
-            ‹
-          </button>
-          <button
-            className="icon-btn"
-            onClick={onNext}
-            disabled={posicion.i === posicion.total - 1}
-            aria-label="Momento siguiente"
-            title="Momento siguiente (→)"
-          >
-            ›
-          </button>
-        </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Cerrar" title="Cerrar (Esc)">
-          ✕
-        </button>
-      </div>
+    <div className="ficha-fondo" onClick={onClose}>
+      <article
+        className="ficha"
+        role="dialog"
+        aria-label={event.title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="ficha-franja"
+          style={{ background: `linear-gradient(90deg, ${color.oscuro}, ${color.base})` }}
+        />
 
-      <div>
-        <span className={`badge badge--${event.kind}`}>{KIND_LABEL[event.kind]}</span>
-        {event.isPivot && <span className="badge badge--pivot">Punto nexo</span>}
-      </div>
-
-      <h2 className="drawer-title">
-        {event.emoji && <span className="drawer-emoji">{event.emoji}</span>}
-        {event.title}
-      </h2>
-      <p className="drawer-date">{fechaLarga(event.date)}</p>
-      {event.place && <p className="drawer-place">📍 {event.place}</p>}
-
-      {event.description && (
-        <div className="drawer-body">
-          {event.description.split('\n').map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      )}
-
-      {event.photos.length > 0 && (
-        <div className="galeria">
-          <h3 className="galeria-titulo">
-            {event.photos.length === 1 ? 'Una foto de ese día' : `${event.photos.length} fotos de ese día`}
-          </h3>
-          <div className={`galeria-grid galeria-grid--${Math.min(event.photos.length, 3)}`}>
-            {event.photos.map((url, i) => (
-              <button
-                key={url}
-                className="galeria-foto"
-                onClick={() => setVerFoto(i)}
-                aria-label={`Ver foto ${i + 1} en grande`}
-              >
-                <img src={url} alt="" loading="lazy" />
-              </button>
-            ))}
+        <header className="ficha-cab">
+          <div className="ficha-nav">
+            <button
+              className="ico"
+              onClick={onPrev}
+              disabled={primero}
+              aria-label="Momento anterior"
+              title="Momento anterior (←)"
+            >
+              <Icono nombre="izquierda" />
+            </button>
+            <span className="ficha-pos">
+              {posicion.i + 1} <i>/</i> {posicion.total}
+            </span>
+            <button
+              className="ico"
+              onClick={onNext}
+              disabled={ultimo}
+              aria-label="Momento siguiente"
+              title="Momento siguiente (→)"
+            >
+              <Icono nombre="derecha" />
+            </button>
           </div>
+
+          <div className="ficha-acciones">
+            <button className="ico" onClick={onEdit} aria-label="Editar" title="Editar">
+              <Icono nombre="editar" />
+            </button>
+            <button
+              className={`ico ico--peligro ${confirmar ? 'ico--armado' : ''}`}
+              onClick={() => setConfirmar(true)}
+              aria-label="Eliminar"
+              title="Eliminar"
+            >
+              <Icono nombre="eliminar" />
+            </button>
+            <button className="ico" onClick={onClose} aria-label="Cerrar" title="Cerrar (Esc)">
+              <Icono nombre="cerrar" />
+            </button>
+          </div>
+        </header>
+
+        {confirmar && (
+          <div className="ficha-confirmar">
+            <span>¿Eliminar este momento?</span>
+            <button className="mini mini--si" onClick={onDelete}>
+              Sí, eliminar
+            </button>
+            <button className="mini" onClick={() => setConfirmar(false)}>
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        <div className="ficha-cuerpo">
+          <p className="ficha-meta">
+            <span className="ficha-fecha">{fechaLarga(event.date)}</span>
+            <span>{KIND_LABEL[event.kind]}</span>
+            {event.place && <span>{event.place}</span>}
+            {event.isPivot && (
+              <span className="ficha-nexo" style={{ color: color.oscuro, borderColor: color.base }}>
+                Punto nexo
+              </span>
+            )}
+          </p>
+
+          <h2 className="ficha-titulo">
+            {event.emoji && <span className="ficha-emoji">{event.emoji}</span>}
+            {event.title}
+          </h2>
+
+          {event.description && (
+            <div className="ficha-texto">
+              {event.description.split('\n').map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+          )}
+
+          {event.photos.length > 0 && (
+            <div className={`galeria-grid galeria-grid--${Math.min(event.photos.length, 3)}`}>
+              {event.photos.map((url, i) => (
+                <button
+                  key={url}
+                  className="galeria-foto"
+                  onClick={() => setVerFoto(i)}
+                  aria-label={`Ver foto ${i + 1} en grande`}
+                >
+                  <img src={url} alt="" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {event.people.length > 0 && (
+            <div className="people">
+              {event.people.map((p) => (
+                <span key={p} className="person">
+                  {p}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </article>
 
       {verFoto !== null && (
         <Lightbox
@@ -117,31 +169,6 @@ export function EventDetail({
           onIr={setVerFoto}
         />
       )}
-
-      {event.people.length > 0 && (
-        <div className="people">
-          {event.people.map((p) => (
-            <span key={p} className="person">
-              {p}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="drawer-actions">
-        <button className="btn btn--ghost" onClick={onEdit}>
-          Editar
-        </button>
-        {confirm ? (
-          <button className="btn btn--danger" onClick={onDelete}>
-            Sí, eliminar
-          </button>
-        ) : (
-          <button className="btn btn--danger-ghost" onClick={() => setConfirm(true)}>
-            Eliminar
-          </button>
-        )}
-      </div>
-    </aside>
+    </div>
   );
 }
