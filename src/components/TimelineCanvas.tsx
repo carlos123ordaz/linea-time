@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Simulation, TimelineEvent } from '../types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { TimelineEvent } from '../types';
 import { buildScale, strandPath, strandY } from '../lib/scale';
 import { fechaCorta } from '../lib/format';
+import { COLORES, colorDe, conAlfa } from '../lib/colores';
 
 const HEIGHT = 720;
 const CY = HEIGHT / 2;
-
-/** Paleta pensada para papel claro: oro oscurecido y colores saturados. */
-const VERDICT_COLOR: Record<Simulation['verdict'], { core: string; glow: string; soft: string }> = {
-  nunca: { core: '#c0392b', glow: '#e05c4a', soft: 'rgba(192, 57, 43, 0.16)' },
-  reconstruida: { core: '#0e7c93', glow: '#3fb6cf', soft: 'rgba(14, 124, 147, 0.16)' },
-  inevitable: { core: '#17845a', glow: '#3fbe8c', soft: 'rgba(23, 132, 90, 0.16)' },
-};
 
 /** RNG con semilla: los filamentos decorativos no deben bailar en cada render. */
 function rng(seed: number) {
@@ -24,70 +18,19 @@ function rng(seed: number) {
 
 interface Props {
   events: TimelineEvent[];
-  simulation: Simulation | null;
   selectedId: string | null;
   onSelect: (e: TimelineEvent) => void;
   zoom: number;
   onZoom: (delta: number) => void;
 }
 
-export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom, onZoom }: Props) {
+export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const branchRef = useRef<SVGPathElement>(null);
-  const [branchPoints, setBranchPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [edges, setEdges] = useState({ left: false, right: false });
 
   const scale = useMemo(() => buildScale(events), [events]);
 
-  /* ── Geometría de la rama alterna ───────────────────────────── */
-  const branch = useMemo(() => {
-    if (!simulation) return null;
-
-    // La rama nace donde la realidad se parte de verdad. Gemini puede ubicar ese
-    // punto antes del que eligió el usuario, si la causa real está más atrás.
-    const div = simulation.divergenceDate ? new Date(simulation.divergenceDate) : null;
-    const quiebre =
-      div && Number.isFinite(div.getTime()) ? div : simulation.pivotDate ?? events[0]?.date;
-    if (!quiebre) return null;
-
-    const px = scale.dateToX(quiebre);
-    const py = strandY(px, CY);
-    const color = VERDICT_COLOR[simulation.verdict];
-
-    if (simulation.verdict === 'nunca') {
-      const ex = px + 780;
-      const ey = py + 248;
-      return {
-        color,
-        d: `M ${px},${py} C ${px + 140},${py + 70} ${px + 430},${ey - 70} ${ex},${ey}`,
-        end: { x: ex, y: ey },
-        rejoins: false,
-        frays: [0.28, 0.02, -0.24].map(
-          (k) =>
-            `M ${ex},${ey} C ${ex + 40},${ey + 30 * k + 10} ${ex + 80},${ey + 120 * k} ${
-              ex + 128
-            },${ey + 190 * k}`
-        ),
-      };
-    }
-
-    const alt = simulation.alternateMeetDate ? new Date(simulation.alternateMeetDate) : null;
-    const valid = alt && Number.isFinite(alt.getTime());
-    const rx = Math.max(px + 620, valid ? scale.dateToX(alt!) : px + 700);
-    const ry = strandY(rx, CY);
-    const amp = simulation.verdict === 'inevitable' ? 95 : 200;
-    const dx = rx - px;
-
-    return {
-      color,
-      d: `M ${px},${py} C ${px + dx * 0.26},${py - amp} ${px + dx * 0.74},${ry - amp} ${rx},${ry}`,
-      end: { x: rx, y: ry },
-      rejoins: true,
-      frays: [] as string[],
-    };
-  }, [simulation, scale, events]);
-
-  const width = Math.max(scale.width, 1400, branch ? branch.end.x + 320 : 0);
+  const width = Math.max(scale.width, 1400);
 
   const filaments = useMemo(() => {
     const rand = rng(Math.round(width));
@@ -116,29 +59,6 @@ export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom,
     for (let y = first; y <= last; y++) out.push({ y, x: scale.dateToX(new Date(y, 0, 1)) });
     return out;
   }, [events, scale]);
-
-  /* Colocamos los eventos de la rama midiendo el path real. */
-  useLayoutEffect(() => {
-    const path = branchRef.current;
-    if (!path || !simulation || simulation.branchEvents.length === 0) {
-      setBranchPoints([]);
-      return;
-    }
-    const total = path.getTotalLength();
-    const n = simulation.branchEvents.length;
-
-    // La rama que cae puede usar casi todo su recorrido. La que se reencuentra
-    // no: sus dos extremos tocan el hilo dorado y las etiquetas se pisarían.
-    const [desde, hasta] = simulation.verdict === 'nunca' ? [0.22, 0.82] : [0.28, 0.78];
-
-    setBranchPoints(
-      simulation.branchEvents.map((_, i) => {
-        const f = n === 1 ? (desde + hasta) / 2 : desde + (i / (n - 1)) * (hasta - desde);
-        const p = path.getPointAtLength(total * f);
-        return { x: p.x, y: p.y };
-      })
-    );
-  }, [simulation, branch]);
 
   /* ── Bordes: pistas de que hay más línea a los lados ────────── */
   const syncEdges = useCallback(() => {
@@ -206,22 +126,19 @@ export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom,
     return () => el.removeEventListener('wheel', onWheel);
   }, [onZoom]);
 
-  /* Al abrir centramos el encuentro; al simular, el punto de quiebre. */
+  /* Al abrir, centramos el encuentro. */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || events.length === 0) return;
-    const target =
-      (simulation?.divergenceDate && new Date(simulation.divergenceDate)) ||
-      (simulation?.pivotDate && new Date(simulation.pivotDate)) ||
-      new Date((events.find((e) => e.kind === 'encuentro') ?? events[events.length - 1]).date);
-    const x = scale.dateToX(target) * zoom;
+    const foco = events.find((e) => e.kind === 'encuentro') ?? events[events.length - 1];
+    const x = scale.dateToX(foco.date) * zoom;
     el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
-  }, [simulation, events, scale, zoom]);
+  }, [events, scale, zoom]);
 
   /* Si eliges un momento con el teclado, lo traemos a la vista. */
   useEffect(() => {
     const el = scrollRef.current;
-    const ev = events.find((e) => e._id === selectedId);
+    const ev = events.find((e) => e.id === selectedId);
     if (!el || !ev) return;
     const x = scale.dateToX(ev.date) * zoom;
     const margen = 180;
@@ -267,11 +184,13 @@ export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom,
               <stop offset="80%" stopColor="#c98b28" />
               <stop offset="100%" stopColor="#8a5a12" />
             </linearGradient>
-            <radialGradient id="node-gold">
-              <stop offset="0%" stopColor="#fff8ea" />
-              <stop offset="52%" stopColor="#e0a63c" />
-              <stop offset="100%" stopColor="#a1690f" />
-            </radialGradient>
+            {COLORES.map((c) => (
+              <radialGradient key={c.id || 'oro'} id={`punto-${c.id || 'oro'}`} cx="36%" cy="32%">
+                <stop offset="0%" stopColor={c.claro} />
+                <stop offset="52%" stopColor={c.base} />
+                <stop offset="100%" stopColor={c.oscuro} />
+              </radialGradient>
+            ))}
           </defs>
 
           {years.map(({ y, x }) => (
@@ -302,111 +221,20 @@ export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom,
           <path d={strandPath(width, CY)} className="strand-core" stroke="url(#gold)" />
           <path d={strandPath(width, CY)} className="strand-flow" />
 
-          {/* rama alterna */}
-          {branch && simulation && (
-            <g className="branch">
-              <path
-                d={branch.d}
-                stroke={branch.color.soft}
-                strokeWidth={16}
-                fill="none"
-                filter="url(#glow-soft)"
-              />
-              <path
-                ref={branchRef}
-                d={branch.d}
-                stroke={branch.color.core}
-                strokeWidth={2.6}
-                fill="none"
-                className="branch-core"
-              />
-              <path d={branch.d} className="branch-flow" stroke={branch.color.glow} />
-
-              {branch.frays.map((d, i) => (
-                <path
-                  key={i}
-                  d={d}
-                  stroke={branch.color.core}
-                  strokeWidth={1.1}
-                  fill="none"
-                  className="fray"
-                />
-              ))}
-
-              {!branch.rejoins && (
-                <g className="branch-end" transform={`translate(${branch.end.x},${branch.end.y})`}>
-                  <circle r={20} fill="none" stroke={branch.color.core} strokeWidth={1.2} opacity={0.5} />
-                  <path d="M -7,-7 L 7,7 M 7,-7 L -7,7" stroke={branch.color.core} strokeWidth={2.4} />
-                  <text y={74} textAnchor="middle" className="branch-end-label">
-                    la línea se apaga
-                  </text>
-                </g>
-              )}
-
-              {branch.rejoins && (
-                <g transform={`translate(${branch.end.x},${branch.end.y})`}>
-                  <circle r={9} fill={branch.color.core} />
-                  <circle
-                    r={22}
-                    fill="none"
-                    stroke={branch.color.core}
-                    strokeWidth={1.2}
-                    className="pulse-ring"
-                  />
-                  <text y={-58} textAnchor="middle" className="branch-end-label">
-                    se conocen igual
-                  </text>
-                  {simulation.alternateMeetDate && (
-                    <text y={-40} textAnchor="middle" className="branch-end-date">
-                      {fechaCorta(simulation.alternateMeetDate)}
-                    </text>
-                  )}
-                </g>
-              )}
-
-              {branchPoints.map((p, i) => {
-                const ev = simulation.branchEvents[i];
-                const arriba = p.y < CY;
-                // Dos alturas alternas: con 4 o 5 eventos en un arco corto,
-                // todas las etiquetas a la misma altura se pisarían.
-                const salto = (i % 2) * 34;
-                return (
-                  <g key={i} transform={`translate(${p.x},${p.y})`} className="branch-node">
-                    <circle r={5.5} fill={branch.color.core} />
-                    <circle r={13} fill="none" stroke={branch.color.core} strokeWidth={1} opacity={0.4} />
-                    <text
-                      y={arriba ? -34 - salto : 40 + salto}
-                      textAnchor="middle"
-                      className="branch-node-title"
-                      fill={branch.color.core}
-                    >
-                      {ev.title.length > 24 ? `${ev.title.slice(0, 23)}…` : ev.title}
-                    </text>
-                    <text
-                      y={arriba ? -17 - salto : 57 + salto}
-                      textAnchor="middle"
-                      className="branch-node-date"
-                    >
-                      {fechaCorta(ev.date)}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          )}
-
           {/* nodos reales */}
           {events.map((ev, i) => {
             const x = scale.dateToX(ev.date);
             const y = strandY(x, CY);
             const r = 5 + ev.importance * 1.6;
             const arriba = i % 2 === 0;
-            const sel = ev._id === selectedId;
+            const sel = ev.id === selectedId;
             const lblY = arriba ? -1 : 1;
+            const c = colorDe(ev.color);
+            const conFotos = ev.photos.length > 0;
 
             return (
               <g
-                key={ev._id}
+                key={ev.id}
                 transform={`translate(${x},${y})`}
                 className={`node kind-${ev.kind} ${sel ? 'is-selected' : ''}`}
                 onClick={() => {
@@ -419,13 +247,26 @@ export function TimelineCanvas({ events, simulation, selectedId, onSelect, zoom,
                 <circle r={38} className="node-hit" />
                 {ev.isPivot && (
                   <>
-                    <circle r={r + 15} className="rune-ring" />
-                    <circle r={r + 23} className="rune-ring rune-ring--slow" />
+                    <circle r={r + 15} className="rune-ring" stroke={conAlfa(c.oscuro, 0.5)} />
+                    <circle
+                      r={r + 23}
+                      className="rune-ring rune-ring--slow"
+                      stroke={conAlfa(c.oscuro, 0.28)}
+                    />
                   </>
                 )}
-                <circle r={r + 9} className="node-aura" />
-                <circle r={r + 13} className="node-ring-selected" />
-                <circle r={r} fill="url(#node-gold)" className="node-core" />
+                <circle r={r + 9} className="node-aura" fill={conAlfa(c.base, 0.28)} />
+                <circle r={r + 13} className="node-ring-selected" stroke={c.oscuro} />
+                <circle r={r} fill={`url(#punto-${c.id || 'oro'})`} className="node-core" />
+
+                {conFotos && (
+                  <g transform={`translate(${r * 0.82}, ${-r * 0.82})`} className="node-fotos">
+                    <circle r={7.5} fill={c.oscuro} stroke="var(--paper)" strokeWidth={1.6} />
+                    <text y={2.8} textAnchor="middle" className="node-fotos-num">
+                      {ev.photos.length}
+                    </text>
+                  </g>
+                )}
 
                 <line y1={lblY * (r + 12)} y2={lblY * (r + 38)} className="node-stem" />
                 <text

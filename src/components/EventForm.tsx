@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { EventInput, EventKind, TimelineEvent } from '../types';
 import { aInputDate } from '../lib/format';
+import { fotos } from '../lib/supabase';
+import { COLORES } from '../lib/colores';
 
 const KINDS: Array<{ value: EventKind; label: string; hint: string }> = [
   { value: 'origen', label: 'Origen', hint: 'Causas lejanas, gente que sin saberlo los acercó' },
@@ -26,12 +28,55 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
   const [emoji, setEmoji] = useState(initial?.emoji ?? '');
   const [importance, setImportance] = useState(initial?.importance ?? 3);
   const [isPivot, setIsPivot] = useState(initial?.isPivot ?? false);
+  const [color, setColor] = useState(initial?.color ?? '');
+  const [photos, setPhotos] = useState<string[]>(initial?.photos ?? []);
+
+  const [subiendo, setSubiendo] = useState(0);
+  const [arrastrando, setArrastrando] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const inputFile = useRef<HTMLInputElement>(null);
+  /** Fotos subidas en esta sesión: si cancelas, se limpian del bucket. */
+  const nuevas = useRef<string[]>([]);
+  const originales = useRef<string[]>(initial?.photos ?? []);
+
+  async function agregarFotos(files: FileList | File[]) {
+    const lista = Array.from(files);
+    if (lista.length === 0) return;
+    setError('');
+    setSubiendo(lista.length);
+    try {
+      for (const file of lista) {
+        const url = await fotos.subir(file);
+        nuevas.current.push(url);
+        setPhotos((prev) => [...prev, url]);
+        setSubiendo((n) => n - 1);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubiendo(0);
+      if (inputFile.current) inputFile.current.value = '';
+    }
+  }
+
+  function quitarFoto(url: string) {
+    setPhotos((prev) => prev.filter((u) => u !== url));
+  }
+
+  async function cancelar() {
+    // Lo que se subió y no se guardó no debe quedar ocupando espacio.
+    const huerfanas = nuevas.current.filter((u) => !originales.current.includes(u));
+    await Promise.allSettled(huerfanas.map((u) => fotos.borrar(u)));
+    onCancel();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return setError('Ponle un título a este momento.');
+    if (subiendo > 0) return setError('Espera a que terminen de subir las fotos.');
+
     setBusy(true);
     setError('');
     try {
@@ -44,8 +89,13 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
         emoji,
         importance,
         isPivot,
+        color,
+        photos,
         people: people.split(',').map((p) => p.trim()).filter(Boolean),
       });
+      // Las que quitaste sí se borran del bucket, ya guardado el cambio.
+      const quitadas = originales.current.filter((u) => !photos.includes(u));
+      Promise.allSettled(quitadas.map((u) => fotos.borrar(u)));
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -53,14 +103,19 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
+    <div className="modal-backdrop" onClick={cancelar}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2 className="modal-title">{initial ? 'Editar momento' : 'Agregar un momento'}</h2>
 
         <div className="field-row">
           <label className="field field--grow">
             <span>Título</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nuestra primera vez en el cine" autoFocus />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Nuestra primera vez en el cine"
+              autoFocus
+            />
           </label>
           <label className="field field--emoji">
             <span>Emoji</span>
@@ -95,6 +150,86 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
             ))}
           </div>
         </label>
+
+        <div className="field">
+          <span>
+            Color del punto <span className="field-hint">— para agrupar o destacar momentos</span>
+          </span>
+          <div className="swatches">
+            {COLORES.map((c) => (
+              <button
+                key={c.id || 'oro'}
+                type="button"
+                title={c.nombre}
+                aria-label={c.nombre}
+                aria-pressed={color === c.id}
+                className={`swatch ${color === c.id ? 'swatch--on' : ''}`}
+                style={{
+                  background: `radial-gradient(circle at 34% 30%, ${c.claro}, ${c.base} 58%, ${c.oscuro})`,
+                }}
+                onClick={() => setColor(c.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span>
+            Fotos <span className="field-hint">— hasta 10 MB cada una</span>
+          </span>
+
+          <div
+            className={`dropzone ${arrastrando ? 'dropzone--activa' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setArrastrando(true);
+            }}
+            onDragLeave={() => setArrastrando(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setArrastrando(false);
+              agregarFotos(e.dataTransfer.files);
+            }}
+            onClick={() => inputFile.current?.click()}
+          >
+            <input
+              ref={inputFile}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => e.target.files && agregarFotos(e.target.files)}
+            />
+            {subiendo > 0 ? (
+              <span className="dropzone-texto">
+                Subiendo {subiendo} {subiendo === 1 ? 'foto' : 'fotos'}…
+              </span>
+            ) : (
+              <span className="dropzone-texto">
+                Arrastra fotos aquí o <u>búscalas en tu computadora</u>
+              </span>
+            )}
+          </div>
+
+          {photos.length > 0 && (
+            <div className="miniaturas">
+              {photos.map((url) => (
+                <div key={url} className="miniatura">
+                  <img src={url} alt="" loading="lazy" />
+                  <button
+                    type="button"
+                    className="miniatura-quitar"
+                    title="Quitar esta foto"
+                    aria-label="Quitar esta foto"
+                    onClick={() => quitarFoto(url)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <label className="field">
           <span>
@@ -138,10 +273,10 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
         {error && <p className="form-error">{error}</p>}
 
         <div className="modal-actions">
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
+          <button type="button" className="btn btn--ghost" onClick={cancelar}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn--gold" disabled={busy}>
+          <button type="submit" className="btn btn--gold" disabled={busy || subiendo > 0}>
             {busy ? 'Guardando…' : initial ? 'Guardar cambios' : 'Agregar a la línea'}
           </button>
         </div>

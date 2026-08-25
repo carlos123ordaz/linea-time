@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { TimelineEvent } from '../types';
 import { fechaLarga } from '../lib/format';
+import { colorDe } from '../lib/colores';
+import { Lightbox } from './Lightbox';
 
 const KIND_LABEL: Record<TimelineEvent['kind'], string> = {
   origen: 'Origen',
@@ -18,7 +20,6 @@ interface Props {
   onNext: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onSimulateFrom: () => void;
 }
 
 export function EventDetail({
@@ -29,12 +30,17 @@ export function EventDetail({
   onNext,
   onEdit,
   onDelete,
-  onSimulateFrom,
 }: Props) {
   const [confirm, setConfirm] = useState(false);
+  const [verFoto, setVerFoto] = useState<number | null>(null);
+  const color = colorDe(event.color);
 
   return (
     <aside className="drawer drawer--right" role="dialog" aria-label={event.title}>
+      <div
+        className="drawer-franja"
+        style={{ background: `linear-gradient(90deg, ${color.base}, ${color.claro})` }}
+      />
       <div className="drawer-topbar">
         <div className="drawer-nav">
           <button
@@ -81,6 +87,37 @@ export function EventDetail({
         </div>
       )}
 
+      {event.photos.length > 0 && (
+        <div className="galeria">
+          <h3 className="galeria-titulo">
+            {event.photos.length === 1 ? 'Una foto de ese día' : `${event.photos.length} fotos de ese día`}
+          </h3>
+          <div className={`galeria-grid galeria-grid--${Math.min(event.photos.length, 3)}`}>
+            {event.photos.map((url, i) => (
+              <button
+                key={url}
+                className="galeria-foto"
+                onClick={() => setVerFoto(i)}
+                aria-label={`Ver foto ${i + 1} en grande`}
+              >
+                <img src={url} alt="" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {verFoto !== null && (
+        <Lightbox
+          fotos={event.photos}
+          indice={verFoto}
+          titulo={event.title}
+          fecha={fechaLarga(event.date)}
+          onCerrar={() => setVerFoto(null)}
+          onIr={setVerFoto}
+        />
+      )}
+
       {event.people.length > 0 && (
         <div className="people">
           {event.people.map((p) => (
@@ -94,9 +131,6 @@ export function EventDetail({
       <div className="drawer-actions">
         <button className="btn btn--ghost" onClick={onEdit}>
           Editar
-        </button>
-        <button className="btn btn--cyan" onClick={onSimulateFrom}>
-          Simular desde aquí
         </button>
         {confirm ? (
           <button className="btn btn--danger" onClick={onDelete}>

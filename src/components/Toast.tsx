@@ -5,6 +5,8 @@ export interface ToastData {
   text: string;
   tone?: 'error';
   action?: { label: string; run: () => void };
+  /** Se llama si el aviso se va solo, sin que nadie use la acción. */
+  onExpire?: () => void;
 }
 
 function Toast({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: number) => void }) {
@@ -12,7 +14,10 @@ function Toast({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: number)
     // Un deshacer necesita mucho más tiempo que un simple aviso: es la última
     // oportunidad de recuperar un recuerdo borrado por accidente.
     const ms = toast.action ? 14000 : 3500;
-    const t = setTimeout(() => onDismiss(toast.id), ms);
+    const t = setTimeout(() => {
+      toast.onExpire?.();
+      onDismiss(toast.id);
+    }, ms);
     return () => clearTimeout(t);
   }, [toast, onDismiss]);
 
