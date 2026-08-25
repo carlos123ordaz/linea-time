@@ -3,6 +3,7 @@ import type { EventInput, EventKind, TimelineEvent } from '../types';
 import { aInputDate } from '../lib/format';
 import { fotos } from '../lib/supabase';
 import { COLORES } from '../lib/colores';
+import { EmojiPicker } from './EmojiPicker';
 
 const KINDS: Array<{ value: EventKind; label: string; hint: string }> = [
   { value: 'origen', label: 'Origen', hint: 'Causas lejanas, gente que sin saberlo los acercó' },
@@ -107,21 +108,15 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2 className="modal-title">{initial ? 'Editar momento' : 'Agregar un momento'}</h2>
 
-        <div className="field-row">
-          <label className="field field--grow">
-            <span>Título</span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nuestra primera vez en el cine"
-              autoFocus
-            />
-          </label>
-          <label className="field field--emoji">
-            <span>Emoji</span>
-            <input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="🎬" maxLength={4} />
-          </label>
-        </div>
+        <label className="field">
+          <span>Título</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Nuestra primera vez en el cine"
+            autoFocus
+          />
+        </label>
 
         <div className="field-row">
           <label className="field">
@@ -151,25 +146,32 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
           </div>
         </label>
 
-        <div className="field">
-          <span>
-            Color del punto <span className="field-hint">— para agrupar o destacar momentos</span>
-          </span>
-          <div className="swatches">
-            {COLORES.map((c) => (
-              <button
-                key={c.id || 'oro'}
-                type="button"
-                title={c.nombre}
-                aria-label={c.nombre}
-                aria-pressed={color === c.id}
-                className={`swatch ${color === c.id ? 'swatch--on' : ''}`}
-                style={{
-                  background: `radial-gradient(circle at 34% 30%, ${c.claro}, ${c.base} 58%, ${c.oscuro})`,
-                }}
-                onClick={() => setColor(c.id)}
-              />
-            ))}
+        <div className="field-row field-row--marcas">
+          <div className="field field--emoji">
+            <span>Emoji</span>
+            <EmojiPicker value={emoji} onChange={setEmoji} />
+          </div>
+
+          <div className="field field--grow">
+            <span>
+              Color del punto <span className="field-hint">— para agrupar o destacar</span>
+            </span>
+            <div className="swatches">
+              {COLORES.map((c) => (
+                <button
+                  key={c.id || 'oro'}
+                  type="button"
+                  title={c.nombre}
+                  aria-label={c.nombre}
+                  aria-pressed={color === c.id}
+                  className={`swatch ${color === c.id ? 'swatch--on' : ''}`}
+                  style={{
+                    background: `radial-gradient(circle at 34% 30%, ${c.claro}, ${c.base} 58%, ${c.oscuro})`,
+                  }}
+                  onClick={() => setColor(c.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
 

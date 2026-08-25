@@ -106,6 +106,16 @@ con el título y la fecha debajo. Ahí las flechas `←` `→` pasan de foto en 
 
 En la línea, los momentos con fotos llevan una **insignia con el número** de fotos.
 
+### Emoji
+
+Cada momento puede llevar un emoji, que aparece junto a su título en la línea. Se elige de
+una **lista agrupada** (Amor, Nosotros, Momentos, Salidas, Comida, Lugares, Cielo y tiempo,
+Recuerdos) en vez de escribirlo a mano, así no se cuela texto que no es un emoji. El botón
+**Sin emoji** lo quita.
+
+Si un momento viejo tiene algo que no está en la lista, se conserva tal cual hasta que
+elijas otro.
+
 ### Colores
 
 Cada punto puede llevar uno de **ocho colores** (oro, rosa, rojo, naranja, verde, turquesa,
@@ -141,12 +151,14 @@ linea-time/
     │   ├── TimelineCanvas.tsx   el hilo dorado (SVG)
     │   ├── EventDetail.tsx      el momento abierto
     │   ├── EventForm.tsx        agregar / editar, subir fotos, elegir color
+    │   ├── EmojiPicker.tsx      lista de emojis por categoría
     │   ├── Lightbox.tsx         ver las fotos a pantalla completa
     │   ├── Toast.tsx            avisos y deshacer
     │   └── Starfield.tsx        el polvo dorado del fondo
     ├── lib/
     │   ├── supabase.ts          único lugar que sabe de la base y del bucket
     │   ├── colores.ts           la paleta de los puntos
+    │   ├── emojis.ts            los emojis disponibles, por grupo
     │   ├── scale.ts             escala de tiempo logarítmica
     │   └── format.ts            fechas en español
     └── styles/index.css
@@ -165,6 +177,8 @@ linea-time/
   sus fotos.
 - **Si cancelas el formulario**, las fotos que habías subido en esa sesión se borran del
   bucket para no dejar basura.
+- **El panel de emojis se ancla a la fila, no al campo**, y se abre empujando hacia abajo:
+  dentro de un modal con scroll, un panel flotante se corta contra los bordes.
 
 ---
 

@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.log
 *.tsbuildinfo
+
+# Key secreta de Supabase: NUNCA se sube
+.secrets.local
