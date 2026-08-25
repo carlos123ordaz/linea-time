@@ -106,7 +106,12 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
   return (
     <div className="modal-backdrop" onClick={cancelar}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2 className="modal-title">{initial ? 'Editar momento' : 'Agregar un momento'}</h2>
+        <div className="modal-cab">
+          <h2 className="modal-title">{initial ? 'Editar momento' : 'Agregar un momento'}</h2>
+          <button type="button" className="ico modal-cerrar" onClick={cancelar} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
 
         <label className="field">
           <span>Título</span>
