@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TimelineEvent } from '../types';
-import { buildScale, strandPath, strandY } from '../lib/scale';
+import { buildScale, strandPath, strandX } from '../lib/scale';
 import { fechaCorta } from '../lib/format';
 import { COLORES, colorDe, conAlfa } from '../lib/colores';
 
-const HEIGHT = 720;
-const CY = HEIGHT / 2;
+const MIN_WIDTH = 340;
 
 /** RNG con semilla: los filamentos decorativos no deben bailar en cada render. */
 function rng(seed: number) {
@@ -26,47 +25,63 @@ interface Props {
 
 export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ left: false, right: false });
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  const [containerW, setContainerW] = useState(MIN_WIDTH);
+
+  /* Medir el ancho real del contenedor. */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerW(Math.max(MIN_WIDTH, Math.floor(entry.contentRect.width)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const WIDTH = containerW;
+  const CX = WIDTH / 2;
+  const labelW = Math.min(190, CX - 60);
 
   const scale = useMemo(() => buildScale(events), [events]);
 
-  const width = Math.max(scale.width, 1400);
+  const height = Math.max(scale.width, 1400);
 
   const filaments = useMemo(() => {
-    const rand = rng(Math.round(width));
-    return Array.from({ length: Math.max(12, Math.floor(width / 150)) }, () => {
-      const x = rand() * width;
+    const rand = rng(Math.round(height));
+    return Array.from({ length: Math.max(12, Math.floor(height / 150)) }, () => {
+      const y = rand() * height;
       const dir = rand() > 0.5 ? -1 : 1;
       const len = 90 + rand() * 260;
       const lift = (50 + rand() * 190) * dir;
-      const y = strandY(x, CY);
+      const x = strandX(y, CX);
       return {
-        d: `M ${x},${y} C ${x + len * 0.3},${y + lift * 0.55} ${x + len * 0.6},${y + lift} ${
-          x + len
-        },${y + lift * 1.12}`,
+        d: `M ${x},${y} C ${x + lift * 0.55},${y + len * 0.3} ${x + lift},${y + len * 0.6} ${
+          x + lift * 1.12
+        },${y + len}`,
         o: 0.1 + rand() * 0.22,
         w: 0.6 + rand() * 0.9,
         delay: rand() * 9,
       };
     });
-  }, [width]);
+  }, [height, CX]);
 
   const years = useMemo(() => {
     if (events.length === 0) return [];
     const first = new Date(events[0].date).getFullYear();
     const last = new Date(events[events.length - 1].date).getFullYear();
-    const out: Array<{ y: number; x: number }> = [];
-    for (let y = first; y <= last; y++) out.push({ y, x: scale.dateToX(new Date(y, 0, 1)) });
+    const out: Array<{ year: number; pos: number }> = [];
+    for (let y = first; y <= last; y++) out.push({ year: y, pos: scale.dateToX(new Date(y, 0, 1)) });
     return out;
   }, [events, scale]);
 
-  /* ── Bordes: pistas de que hay más línea a los lados ────────── */
+  /* ── Bordes: pistas de que hay más línea arriba/abajo ───────── */
   const syncEdges = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     setEdges({
-      left: el.scrollLeft > 24,
-      right: el.scrollLeft < el.scrollWidth - el.clientWidth - 24,
+      top: el.scrollTop > 24,
+      bottom: el.scrollTop < el.scrollHeight - el.clientHeight - 24,
     });
   }, []);
 
@@ -74,13 +89,13 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     syncEdges();
     window.addEventListener('resize', syncEdges);
     return () => window.removeEventListener('resize', syncEdges);
-  }, [syncEdges, width, zoom]);
+  }, [syncEdges, height, zoom]);
 
   const nudge = (dir: -1 | 1) =>
-    scrollRef.current?.scrollBy({ left: dir * 420, behavior: 'smooth' });
+    scrollRef.current?.scrollBy({ top: dir * 420, behavior: 'smooth' });
 
   /* ── Arrastrar para recorrer la línea ───────────────────────── */
-  const drag = useRef({ active: false, startX: 0, startScroll: 0 });
+  const drag = useRef({ active: false, startY: 0, startScroll: 0 });
   const movedRef = useRef(false);
   const [dragging, setDragging] = useState(false);
 
@@ -88,7 +103,7 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     if (e.button !== 0) return;
     const el = scrollRef.current;
     if (!el) return;
-    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft };
+    drag.current = { active: true, startY: e.clientY, startScroll: el.scrollTop };
     movedRef.current = false;
     setDragging(true);
   }
@@ -97,9 +112,9 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     if (!drag.current.active) return;
     const el = scrollRef.current;
     if (!el) return;
-    const dx = e.clientX - drag.current.startX;
-    if (Math.abs(dx) > 4) movedRef.current = true;
-    el.scrollLeft = drag.current.startScroll - dx;
+    const dy = e.clientY - drag.current.startY;
+    if (Math.abs(dy) > 4) movedRef.current = true;
+    el.scrollTop = drag.current.startScroll - dy;
   }
 
   const endDrag = () => {
@@ -107,7 +122,7 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     setDragging(false);
   };
 
-  /* Rueda: vertical mueve la línea; con Cmd/Ctrl hace zoom. */
+  /* Rueda: con Cmd/Ctrl hace zoom. */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -115,24 +130,24 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         onZoom(e.deltaY > 0 ? -0.1 : 0.1);
-        return;
-      }
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [onZoom]);
 
-  /* Al abrir, centramos el encuentro. */
+  /* Al abrir, centramos el momento más cercano a hoy. */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || events.length === 0) return;
-    const foco = events.find((e) => e.kind === 'encuentro') ?? events[events.length - 1];
-    const x = scale.dateToX(foco.date) * zoom;
-    el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
+    const ahora = Date.now();
+    const foco = events.reduce((mejor, ev) =>
+      Math.abs(new Date(ev.date).getTime() - ahora) < Math.abs(new Date(mejor.date).getTime() - ahora)
+        ? ev
+        : mejor
+    );
+    const y = scale.dateToX(foco.date) * zoom;
+    el.scrollTo({ top: Math.max(0, y - el.clientHeight / 2), behavior: 'smooth' });
   }, [events, scale, zoom]);
 
   /* Si eliges un momento con el teclado, lo traemos a la vista. */
@@ -140,15 +155,14 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     const el = scrollRef.current;
     const ev = events.find((e) => e.id === selectedId);
     if (!el || !ev) return;
-    const x = scale.dateToX(ev.date) * zoom;
+    const y = scale.dateToX(ev.date) * zoom;
     const margen = 180;
-    if (x < el.scrollLeft + margen || x > el.scrollLeft + el.clientWidth - margen) {
-      el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
+    if (y < el.scrollTop + margen || y > el.scrollTop + el.clientHeight - margen) {
+      el.scrollTo({ top: Math.max(0, y - el.clientHeight / 2), behavior: 'smooth' });
     }
   }, [selectedId, events, scale, zoom]);
 
-  const svgW = width * zoom;
-  const svgH = HEIGHT * zoom;
+  const svgH = height * zoom;
 
   return (
     <div className="canvas-outer">
@@ -161,23 +175,23 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
-        <svg width={svgW} height={svgH} viewBox={`0 0 ${width} ${HEIGHT}`} className="canvas-svg">
+        <svg width="100%" height={svgH} viewBox={`0 0 ${WIDTH} ${height}`} className="canvas-svg">
           <defs>
-            <filter id="glow-soft" x="-30%" y="-200%" width="160%" height="500%">
+            <filter id="glow-soft" x="-200%" y="-30%" width="500%" height="160%">
               <feGaussianBlur stdDeviation="9" result="b" />
               <feMerge>
                 <feMergeNode in="b" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            <filter id="glow-hard" x="-30%" y="-200%" width="160%" height="500%">
+            <filter id="glow-hard" x="-200%" y="-30%" width="500%" height="160%">
               <feGaussianBlur stdDeviation="2.4" result="b" />
               <feMerge>
                 <feMergeNode in="b" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+            <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#8a5a12" />
               <stop offset="20%" stopColor="#c98b28" />
               <stop offset="50%" stopColor="#e8bd68" />
@@ -193,9 +207,9 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
             ))}
           </defs>
 
-          {years.map(({ y, x }) => (
-            <text key={y} x={x} y={CY - 246} className="year-mark" textAnchor="middle">
-              {y}
+          {years.map(({ year, pos }) => (
+            <text key={year} x={CX} y={pos} className="year-mark" textAnchor="middle">
+              {year}
             </text>
           ))}
 
@@ -216,29 +230,29 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
 
           {/* hilo principal */}
           <g filter="url(#glow-soft)">
-            <path d={strandPath(width, CY)} className="strand-halo" />
+            <path d={strandPath(height, CX)} className="strand-halo" />
           </g>
-          <path d={strandPath(width, CY)} className="strand-core" stroke="url(#gold)" />
-          <path d={strandPath(width, CY)} className="strand-flow" />
+          <path d={strandPath(height, CX)} className="strand-core" stroke="url(#gold)" />
+          <path d={strandPath(height, CX)} className="strand-flow" />
 
           {/* nodos reales */}
           {events.map((ev, i) => {
-            const x = scale.dateToX(ev.date);
-            const y = strandY(x, CY);
+            const posY = scale.dateToX(ev.date);
+            const posX = strandX(posY, CX);
             const r = 5 + ev.importance * 1.6;
-            const arriba = i % 2 === 0;
+            const izq = i % 2 === 0;
             const sel = ev.id === selectedId;
-            const lblY = arriba ? -1 : 1;
+            const lblDir = izq ? -1 : 1;
             const c = colorDe(ev.color);
             const conFotos = ev.photos.length > 0;
 
             return (
               <g
                 key={ev.id}
-                transform={`translate(${x},${y})`}
+                transform={`translate(${posX},${posY})`}
                 className={`node kind-${ev.kind} ${sel ? 'is-selected' : ''}`}
                 onClick={() => {
-                  if (movedRef.current) return; // fue un arrastre, no un clic
+                  if (movedRef.current) return;
                   onSelect(ev);
                 }}
                 role="button"
@@ -268,38 +282,37 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
                   </g>
                 )}
 
-                <line y1={lblY * (r + 12)} y2={lblY * (r + 38)} className="node-stem" />
-                <text
-                  y={lblY * (r + 56)}
-                  textAnchor="middle"
-                  className="node-title"
-                  dominantBaseline={arriba ? 'auto' : 'hanging'}
-                >
-                  {ev.emoji ? `${ev.emoji}  ` : ''}
-                  {ev.title.length > 30 ? `${ev.title.slice(0, 29)}…` : ev.title}
-                </text>
-                <text
-                  y={lblY * (r + 56) + (arriba ? -19 : 21)}
-                  textAnchor="middle"
-                  className="node-date"
-                  dominantBaseline={arriba ? 'auto' : 'hanging'}
-                >
-                  {fechaCorta(ev.date)} · {new Date(ev.date).getFullYear()}
-                </text>
+                <line x1={lblDir * (r + 12)} x2={lblDir * (r + 38)} className="node-stem" />
+                {(() => {
+                  const foX = izq ? -(r + 44) - labelW : r + 44;
+                  return (
+                    <foreignObject x={foX} y={-14} width={labelW} height={120} className="node-label-fo">
+                      <div className={`node-label ${izq ? 'node-label--izq' : ''}`}>
+                        <div className="node-title">
+                          {ev.emoji ? `${ev.emoji}  ` : ''}
+                          {ev.title}
+                        </div>
+                        <div className="node-date">
+                          {fechaCorta(ev.date)} · {new Date(ev.date).getFullYear()}
+                        </div>
+                      </div>
+                    </foreignObject>
+                  );
+                })()}
               </g>
             );
           })}
         </svg>
       </div>
 
-      <div className={`edge-hint edge-hint--left${edges.left ? ' is-on' : ''}`}>
+      <div className={`edge-hint edge-hint--top${edges.top ? ' is-on' : ''}`}>
         <button onClick={() => nudge(-1)} aria-label="Ver momentos anteriores">
-          ‹
+          ▲
         </button>
       </div>
-      <div className={`edge-hint edge-hint--right${edges.right ? ' is-on' : ''}`}>
+      <div className={`edge-hint edge-hint--bottom${edges.bottom ? ' is-on' : ''}`}>
         <button onClick={() => nudge(1)} aria-label="Ver momentos siguientes">
-          ›
+          ▼
         </button>
       </div>
     </div>

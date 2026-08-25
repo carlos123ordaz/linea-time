@@ -62,15 +62,15 @@ export function buildScale(events: TimelineEvent[]): TimeScale {
 }
 
 /** Ondulacion suave del hilo principal: la linea nunca es perfectamente recta. */
-export function strandY(x: number, cy: number): number {
-  return cy + Math.sin(x / 190) * 11 + Math.sin(x / 61 + 1.2) * 4;
+export function strandX(y: number, cx: number): number {
+  return cx + Math.sin(y / 190) * 11 + Math.sin(y / 61 + 1.2) * 4;
 }
 
-/** Path SVG del hilo principal. */
-export function strandPath(width: number, cy: number, step = 14): string {
+/** Path SVG del hilo principal (vertical). */
+export function strandPath(height: number, cx: number, step = 14): string {
   let d = '';
-  for (let x = 0; x <= width; x += step) {
-    d += `${x === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${strandY(x, cy).toFixed(1)} `;
+  for (let y = 0; y <= height; y += step) {
+    d += `${y === 0 ? 'M' : 'L'} ${strandX(y, cx).toFixed(1)} ${y.toFixed(1)} `;
   }
   return d;
 }

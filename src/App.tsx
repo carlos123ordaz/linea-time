@@ -14,6 +14,7 @@ const porFecha = (a: TimelineEvent, b: TimelineEvent) => +new Date(a.date) - +ne
 export default function App() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<TimelineEvent | null | undefined>(undefined);
   /** Índice de la foto abierta a pantalla completa, o null. */
   const [fotoIndice, setFotoIndice] = useState<number | null>(null);
@@ -53,7 +54,7 @@ export default function App() {
       .finally(() => setLoading(false));
   }, []);
 
-  /* ── Teclado: ← → recorren la línea, Esc cierra, N agrega ───── */
+  /* ── Teclado: ↑ ↓ recorren la línea, Esc cierra, N agrega ───── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
@@ -68,22 +69,28 @@ export default function App() {
       if (e.key === 'Escape') {
         if (editing !== undefined) setEditing(undefined);
         else if (selectedId) setSelectedId(null);
+        else if (highlightedId) setHighlightedId(null);
         return;
       }
 
       if (enCampo || editing !== undefined || events.length === 0) return;
 
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const paso = e.key === 'ArrowRight' ? 1 : -1;
-        const actual = events.findIndex((ev) => ev.id === selectedId);
+        const paso = e.key === 'ArrowDown' ? 1 : -1;
+        const actual = events.findIndex((ev) => ev.id === highlightedId);
         const siguiente =
           actual === -1
             ? paso === 1
               ? 0
               : events.length - 1
             : Math.min(events.length - 1, Math.max(0, actual + paso));
-        setSelectedId(events[siguiente].id);
+        setHighlightedId(events[siguiente].id);
+      }
+
+      if (e.key === 'Enter' && highlightedId && !selectedId) {
+        e.preventDefault();
+        setSelectedId(highlightedId);
       }
 
       if (e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey) {
@@ -93,7 +100,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editing, selectedId, events, fotoIndice]);
+  }, [editing, selectedId, highlightedId, events, fotoIndice]);
 
   /* Cambiar de momento cierra el visor: el índice de fotos era del anterior. */
   useEffect(() => {
@@ -183,7 +190,12 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <h1>Carlos &amp; Diesslly</h1>
-          <p className="brand-sub">
+          {noviazgo && (
+            <p className="brand-sub brand-sub--mobile">
+              Juntos hace <strong>{tiempoDesde(noviazgo.date)}</strong>
+            </p>
+          )}
+          <p className="brand-sub brand-sub--desktop">
             {encuentro && (
               <>
                 Nos conocimos hace <strong>{tiempoDesde(encuentro.date)}</strong>
@@ -234,7 +246,7 @@ export default function App() {
       ) : (
         <TimelineCanvas
           events={events}
-          selectedId={selectedId}
+          selectedId={highlightedId ?? selectedId}
           onSelect={(e) => setSelectedId(e.id)}
           zoom={zoom}
           onZoom={(d) => setZoom((z) => Math.min(1.8, Math.max(0.45, +(z + d).toFixed(2))))}
@@ -273,8 +285,8 @@ export default function App() {
 
       {!selected && editing === undefined && (
         <div className="shortcuts">
-          <kbd>←</kbd>
-          <kbd>→</kbd> recorrer · <kbd>N</kbd> nuevo momento · arrastra para mover
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> recorrer · <kbd>Enter</kbd> abrir · <kbd>N</kbd> nuevo momento
         </div>
       )}
     </div>
