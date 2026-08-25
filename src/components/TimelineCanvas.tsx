@@ -147,8 +147,21 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
         : mejor
     );
     const y = scale.dateToX(foco.date) * zoom;
-    el.scrollTo({ top: Math.max(0, y - el.clientHeight / 2), behavior: 'smooth' });
+    const x = (el.scrollWidth - el.clientWidth) / 2;
+    el.scrollTo({ left: Math.max(0, x), top: Math.max(0, y - el.clientHeight / 2), behavior: 'smooth' });
   }, [events, scale, zoom]);
+
+  /* Cuando cambia el zoom, centrar horizontalmente. */
+  const prevZoom = useRef(zoom);
+  useEffect(() => {
+    if (prevZoom.current === zoom) return;
+    prevZoom.current = zoom;
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    });
+  }, [zoom]);
 
   /* Si eliges un momento con el teclado, lo traemos a la vista. */
   useEffect(() => {
@@ -162,6 +175,7 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
     }
   }, [selectedId, events, scale, zoom]);
 
+  const svgW = WIDTH * zoom;
   const svgH = height * zoom;
 
   return (
@@ -175,7 +189,7 @@ export function TimelineCanvas({ events, selectedId, onSelect, zoom, onZoom }: P
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
-        <svg width="100%" height={svgH} viewBox={`0 0 ${WIDTH} ${height}`} className="canvas-svg">
+        <svg width={svgW} height={svgH} viewBox={`0 0 ${WIDTH} ${height}`} className="canvas-svg">
           <defs>
             <filter id="glow-soft" x="-200%" y="-30%" width="500%" height="160%">
               <feGaussianBlur stdDeviation="9" result="b" />

@@ -33,7 +33,7 @@
   --line-strong: #d5c6b0;
 
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --display: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --emoji: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
   --shadow-sm: 0 1px 2px rgba(74, 56, 32, 0.06), 0 2px 8px rgba(74, 56, 32, 0.05);
@@ -181,7 +181,7 @@ body {
 .canvas-wrap {
   position: absolute;
   inset: 0;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: auto;
   cursor: grab;
   scrollbar-width: thin;
@@ -197,7 +197,7 @@ body {
 }
 .canvas-wrap::-webkit-scrollbar-thumb:hover { background: var(--ink-4); background-clip: padding-box; }
 
-.canvas-svg { display: block; }
+.canvas-svg { display: block; margin: 0 auto; }
 
 /* Pistas de que hay más línea arriba/abajo */
 .edge-hint {
