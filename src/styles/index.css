@@ -382,11 +382,19 @@ body {
 .field-row { display: flex; flex-direction: column; gap: 12px; }
 .field-row--end { align-items: stretch; }
 .field--grow { flex: 1; min-width: 0; }
+.field--fecha { flex: none; }
+.field--fecha input[type='date'] {
+  max-width: 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
 .field--emoji { flex: none; }
 
 @media (min-width: 521px) {
   .field-row { flex-direction: row; }
   .field-row--end { align-items: flex-end; }
+  .field--fecha { width: 180px; }
   .field--emoji { width: 96px; }
 }
 

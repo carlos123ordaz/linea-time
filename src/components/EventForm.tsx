@@ -124,7 +124,7 @@ export function EventForm({ initial, onCancel, onSave }: Props) {
         </label>
 
         <div className="field-row">
-          <label className="field">
+          <label className="field field--fecha">
             <span>Fecha</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
