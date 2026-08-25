@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { TimelineEvent } from '../types';
 import { fechaLarga } from '../lib/format';
 import { colorDe } from '../lib/colores';
-import { Lightbox } from './Lightbox';
 import { Icono } from './Icono';
 
 const KIND_LABEL: Record<TimelineEvent['kind'], string> = {
@@ -21,6 +20,8 @@ interface Props {
   onNext: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** El visor de fotos lo abre App, que es quien manda en el teclado. */
+  onVerFoto: (indice: number) => void;
 }
 
 export function EventDetail({
@@ -31,9 +32,9 @@ export function EventDetail({
   onNext,
   onEdit,
   onDelete,
+  onVerFoto,
 }: Props) {
   const [confirmar, setConfirmar] = useState(false);
-  const [verFoto, setVerFoto] = useState<number | null>(null);
   const color = colorDe(event.color);
 
   const primero = posicion.i === 0;
@@ -138,7 +139,7 @@ export function EventDetail({
                 <button
                   key={url}
                   className="galeria-foto"
-                  onClick={() => setVerFoto(i)}
+                  onClick={() => onVerFoto(i)}
                   aria-label={`Ver foto ${i + 1} en grande`}
                 >
                   <img src={url} alt="" loading="lazy" />
@@ -158,17 +159,6 @@ export function EventDetail({
           )}
         </div>
       </article>
-
-      {verFoto !== null && (
-        <Lightbox
-          fotos={event.photos}
-          indice={verFoto}
-          titulo={event.title}
-          fecha={fechaLarga(event.date)}
-          onCerrar={() => setVerFoto(null)}
-          onIr={setVerFoto}
-        />
-      )}
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, fotos, configurado } from './lib/supabase';
 import type { EventInput, TimelineEvent } from './types';
-import { tiempoDesde } from './lib/format';
+import { fechaLarga, tiempoDesde } from './lib/format';
 import { Starfield } from './components/Starfield';
 import { TimelineCanvas } from './components/TimelineCanvas';
 import { EventDetail } from './components/EventDetail';
 import { EventForm } from './components/EventForm';
+import { Lightbox } from './components/Lightbox';
 import { ToastStack, type ToastData } from './components/Toast';
 
 const porFecha = (a: TimelineEvent, b: TimelineEvent) => +new Date(a.date) - +new Date(b.date);
@@ -14,6 +15,8 @@ export default function App() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<TimelineEvent | null | undefined>(undefined);
+  /** Índice de la foto abierta a pantalla completa, o null. */
+  const [fotoIndice, setFotoIndice] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fatal, setFatal] = useState('');
@@ -57,6 +60,11 @@ export default function App() {
         (e.target as HTMLElement)?.tagName ?? ''
       );
 
+      // Con una foto abierta, el visor se queda con las flechas y con Esc.
+      // Si no, al pasar de foto saltábamos también de momento y el visor
+      // terminaba apuntando a un recuerdo sin fotos: en blanco.
+      if (fotoIndice !== null) return;
+
       if (e.key === 'Escape') {
         if (editing !== undefined) setEditing(undefined);
         else if (selectedId) setSelectedId(null);
@@ -85,7 +93,12 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editing, selectedId, events]);
+  }, [editing, selectedId, events, fotoIndice]);
+
+  /* Cambiar de momento cierra el visor: el índice de fotos era del anterior. */
+  useEffect(() => {
+    setFotoIndice(null);
+  }, [selectedId]);
 
   const encuentro = useMemo(() => events.find((e) => e.kind === 'encuentro'), [events]);
   const noviazgo = useMemo(
@@ -237,6 +250,18 @@ export default function App() {
           onNext={() => setSelectedId(events[Math.min(events.length - 1, selectedIndex + 1)].id)}
           onEdit={() => setEditing(selected)}
           onDelete={() => deleteEvent(selected)}
+          onVerFoto={setFotoIndice}
+        />
+      )}
+
+      {selected && fotoIndice !== null && selected.photos[fotoIndice] && (
+        <Lightbox
+          fotos={selected.photos}
+          indice={fotoIndice}
+          titulo={selected.title}
+          fecha={fechaLarga(selected.date)}
+          onCerrar={() => setFotoIndice(null)}
+          onIr={setFotoIndice}
         />
       )}
 

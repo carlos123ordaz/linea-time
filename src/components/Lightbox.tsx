@@ -22,15 +22,14 @@ export function Lightbox({ fotos, indice, titulo, fecha, onCerrar, onIr }: Props
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      // Mientras el visor está abierto, estas teclas son suyas y de nadie más.
+      e.preventDefault();
+      e.stopPropagation();
+
       if (e.key === 'Escape') onCerrar();
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        anterior();
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        siguiente();
-      }
+      else if (e.key === 'ArrowLeft') anterior();
+      else siguiente();
     };
     // Captura: le ganamos al atajo global que recorre la línea de tiempo.
     window.addEventListener('keydown', onKey, true);
